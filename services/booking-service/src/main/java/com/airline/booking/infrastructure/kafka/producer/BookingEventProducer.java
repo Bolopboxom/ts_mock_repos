@@ -35,4 +35,14 @@ public class BookingEventProducer {
             throw new RuntimeException(e);
         }
     }
+
+    public void publishBookingCancelled(String payloadJson, String correlationId) {
+        try {
+            EventEnvelope envelope = new EventEnvelope(correlationId, objectMapper.readTree(payloadJson));
+            String message = objectMapper.writeValueAsString(envelope);
+            kafkaTemplate.send("booking.cancelled.v1", envelope.eventId, message);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
 }

@@ -33,4 +33,14 @@ public class LoyaltyEventProducer {
             throw new RuntimeException(e);
         }
     }
+
+    public void publishPointsReleased(Object payload, String correlationId) {
+        try {
+            EventEnvelope envelope = new EventEnvelope(correlationId, payload);
+            String message = objectMapper.writeValueAsString(envelope);
+            kafkaTemplate.send("loyalty.points.released.v1", envelope.eventId, message);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
 }

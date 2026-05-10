@@ -21,8 +21,14 @@ public class PaymentConsumer {
             JsonNode node = objectMapper.readTree(message);
             JsonNode payload = node.get("payload");
             String bookingId = payload.get("bookingId").asText();
-            // mock payment success
-            System.out.println("Payment processed for booking=" + bookingId);
+            // simulate a payment failure path based on bookingId ending with 'fail' (demo)
+            if (bookingId.endsWith("fail")) {
+                Object payFailed = objectMapper.createObjectNode().put("bookingId", bookingId).put("reason", "simulated_failure");
+                String correlationId = node.has("correlationId") ? node.get("correlationId").asText() : null;
+                producer.publishPaymentFailed(payFailed, correlationId);
+                return;
+            }
+            // normal success
             Object pay = objectMapper.createObjectNode()
                     .put("bookingId", bookingId)
                     .put("transactionId", "txn-" + bookingId);
