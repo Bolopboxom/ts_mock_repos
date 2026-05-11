@@ -4,10 +4,12 @@ import com.airline.booking.domain.repository.BookingRepository;
 import com.airline.booking.infrastructure.kafka.producer.BookingEventProducer;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
 @Component
+@Slf4j
 public class PaymentFailedConsumer {
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final BookingEventProducer producer;
@@ -24,7 +26,7 @@ public class PaymentFailedConsumer {
             JsonNode node = objectMapper.readTree(message);
             JsonNode payload = node.get("payload");
             String bookingId = payload.get("bookingId").asText();
-            System.out.println("Payment failed for booking=" + bookingId + " -> cancelling booking and publishing booking.cancelled.v1");
+            log.info("Payment failed for booking={} -> cancelling booking and publishing booking.cancelled.v1", bookingId);
 
             // build cancellation payload and publish
             JsonNode cancelNode = objectMapper.createObjectNode()
@@ -39,10 +41,10 @@ public class PaymentFailedConsumer {
             if (booking != null) {
                 booking.setStatus(com.airline.booking.domain.model.Booking.Status.CANCELLED);
                 bookingRepository.save(booking);
-                System.out.println("Booking " + bookingId + " set to CANCELLED");
+                log.info("Booking {} set to CANCELLED", bookingId);
             }
         } catch (Exception e) {
-            System.err.println("PaymentFailedConsumer error: " + e.getMessage());
+            log.error("PaymentFailedConsumer error: {}", e.getMessage(), e);
         }
     }
 }

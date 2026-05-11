@@ -2,10 +2,12 @@ package com.airline.notification.infrastructure.kafka.consumer;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
 @Component
+@Slf4j
 public class NotificationConsumer {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -16,9 +18,9 @@ public class NotificationConsumer {
             JsonNode payload = node.get("payload");
             String bookingId = payload.get("bookingId").asText();
             String ticketNumber = payload.has("ticketNumber") ? payload.get("ticketNumber").asText() : "";
-            System.out.println("Notification: send email for booking=" + bookingId + " ticket=" + ticketNumber);
+            log.info("Notification: send email for booking={} ticket={}", bookingId, ticketNumber);
         } catch (Exception e) {
-            System.err.println("NotificationConsumer error: " + e.getMessage());
+            log.error("NotificationConsumer error: {}", e.getMessage(), e);
         }
     }
 }

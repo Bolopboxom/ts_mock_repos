@@ -3,10 +3,12 @@ package com.airline.loyalty.infrastructure.kafka.consumer;
 import com.airline.loyalty.infrastructure.kafka.producer.LoyaltyEventProducer;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
 @Component
+@Slf4j
 public class LoyaltyConsumer {
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final LoyaltyEventProducer producer;
@@ -24,7 +26,7 @@ public class LoyaltyConsumer {
             String customerId = payload.has("customerId") ? payload.get("customerId").asText() : "UNKNOWN";
             int points = payload.has("points") ? payload.get("points").asInt() : 0;
             // reserve points (demo)
-            System.out.println("Loyalty reserve for booking=" + bookingId + " customer=" + customerId);
+            log.info("Loyalty reserve for booking={} customer={}", bookingId, customerId);
             // publish loyalty.points.reserved.v1
             Object pay = objectMapper.createObjectNode()
                     .put("bookingId", bookingId)
@@ -33,7 +35,7 @@ public class LoyaltyConsumer {
             String correlationId = node.has("correlationId") ? node.get("correlationId").asText() : null;
             producer.publishPointsReserved(pay, correlationId);
         } catch (Exception e) {
-            System.err.println("LoyaltyConsumer error: " + e.getMessage());
+            log.error("LoyaltyConsumer error: {}", e.getMessage(), e);
         }
     }
 }

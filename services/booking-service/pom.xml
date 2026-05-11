@@ -54,14 +54,21 @@
             <version>19.8.0.0</version>
         </dependency>
 
-        <!-- Resilience4j -->
+        <!-- H2 for demo/local runs -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!-- Resilience4j (removed for demo) -->
+        <!--
         <dependency>
             <groupId>io.github.resilience4j</groupId>
             <artifactId>resilience4j-spring-boot3</artifactId>
             <version>2.0.0</version>
         </dependency>
-
-        <!-- Flyway (removed per request) -->
+        -->
 
         <!-- Testing -->
         <dependency>
@@ -81,6 +88,45 @@
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
             <optional>true</optional>
+        </dependency>
+
+        <!-- libs-common module dependency -->
+        <dependency>
+            <groupId>com.airline</groupId>
+            <artifactId>libs-common</artifactId>
+            <version>0.1.0-SNAPSHOT</version>
+        </dependency>
+
+        <!-- Test helpers -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Test-scoped access to other service modules for integration-style tests -->
+        <dependency>
+            <groupId>com.airline</groupId>
+            <artifactId>seat-service</artifactId>
+            <version>0.1.0-SNAPSHOT</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.airline</groupId>
+            <artifactId>loyalty-service</artifactId>
+            <version>0.1.0-SNAPSHOT</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.airline</groupId>
+            <artifactId>payment-service</artifactId>
+            <version>0.1.0-SNAPSHOT</version>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 
