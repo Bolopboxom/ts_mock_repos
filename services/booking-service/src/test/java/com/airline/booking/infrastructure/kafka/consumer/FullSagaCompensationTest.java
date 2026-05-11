@@ -21,11 +21,11 @@ import java.util.concurrent.BlockingQueue;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest(classes = BookingApplication.class, properties = "spring.kafka.bootstrap-servers=${spring.embedded.kafka.brokers}")
-@EmbeddedKafka(partitions = 1, topics = {"booking.created.v1", "seat.reserved.v1", "loyalty.points.reserved.v1", "payment.completed.v1", "booking.confirmed.v1", "loyalty.points.deducted.v1"})
+@EmbeddedKafka(partitions = 1, topics = {"booking.created.v1", "seat.reserved.v1", "loyalty.points.reserved.v1", "payment.failed.v1", "loyalty.points.released.v1", "seat.released.v1", "booking.cancelled.v1", "booking.confirmed.v1", "payment.completed.v1", "loyalty.points.deducted.v1"})
 @Import(SimulatorsTestConfig.class)
 @ActiveProfiles("demo")
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
-public class FullSagaE2ETest {
+public class FullSagaCompensationTest {
 
     @Autowired
     private KafkaTemplate<String, String> kafkaTemplate;
@@ -34,7 +34,13 @@ public class FullSagaE2ETest {
     private BookingRepository bookingRepository;
 
     @Autowired
-    private BlockingQueue<String> deductedQueue;
+    private BlockingQueue<String> releasedPointsQueue;
+
+    @Autowired
+    private BlockingQueue<String> releasedSeatQueue;
+
+    @Autowired
+    private BlockingQueue<String> cancelledQueue;
 
     @Autowired
     private KafkaListenerEndpointRegistry kafkaListenerEndpointRegistry;
@@ -47,82 +53,68 @@ public class FullSagaE2ETest {
             boolean allRunning = true;
             boolean allAssigned = true;
             for (MessageListenerContainer container : kafkaListenerEndpointRegistry.getListenerContainers()) {
-                if (!container.isRunning()) {
-                    allRunning = false;
-                    break;
-                }
+                if (!container.isRunning()) { allRunning = false; break; }
                 if (container instanceof org.springframework.kafka.listener.KafkaMessageListenerContainer) {
                     org.springframework.kafka.listener.KafkaMessageListenerContainer<?,?> kafkaContainer = (org.springframework.kafka.listener.KafkaMessageListenerContainer<?,?>) container;
                     try {
                         java.util.Collection<org.apache.kafka.common.TopicPartition> assigned = kafkaContainer.getAssignedPartitions();
-                        if (assigned == null || assigned.isEmpty()) {
-                            allAssigned = false;
-                            break;
-                        }
+                        if (assigned == null || assigned.isEmpty()) { allAssigned = false; break; }
                     } catch (UnsupportedOperationException ignored) {
-                        // older versions may not support getAssignedPartitions
+                        // ignore
                     }
                 }
             }
-            if (allRunning && allAssigned) {
-                Thread.sleep(500);
-                return;
-            }
+            if (allRunning && allAssigned) { Thread.sleep(500); return; }
             Thread.sleep(100);
         }
     }
 
     @Test
-    void endToEnd_happyPath_allSteps() throws Exception {
-        String bookingId = "BKG-E2E-1";
-        Booking booking = new Booking(bookingId, "CUST-1", "FL-1");
+    void compensationPath_paymentFailed_releases_points_releases_seat_and_cancels_booking() throws Exception {
+        String bookingId = "BKG-COMP-TEST-1";
+        Booking booking = new Booking(bookingId, "CUST-X", "FL-X");
         bookingRepository.save(booking);
 
-        // wait for Kafka listener containers (simulators + consumers) to be running to avoid lost deliveries
-        // allow more time for containers to start and for any rebalance to settle
+        // ensure listeners are started and partitions assigned
         waitForListenerContainers(15000);
+        Thread.sleep(1000); // allow group stabilization
 
-        int containerCount = 0;
-        Object containersObj = kafkaListenerEndpointRegistry.getListenerContainers();
-        if (containersObj == null) {
-            containerCount = 0;
-        } else if (containersObj.getClass().isArray()) {
-            containerCount = java.lang.reflect.Array.getLength(containersObj);
-        } else if (containersObj instanceof java.util.Collection) {
-            containerCount = ((java.util.Collection<?>) containersObj).size();
-        } else {
-            containerCount = 1; // fallback
-        }
-        System.out.println("[test] listener containers count=" + containerCount);
-        // small extra sleep to let any final rebalance events settle before sending the first message
-        Thread.sleep(1000);
-
-        // publish booking.created.v1 (start of saga)
+        // publish booking.created.v1 to start the saga
         JsonNode payload = objectMapper.createObjectNode()
                 .put("bookingId", bookingId)
-                .put("customerId", "CUST-1")
-                .put("flightId", "FL-1");
+                .put("customerId", "CUST-X")
+                .put("flightId", "FL-X");
         String envelope = objectMapper.createObjectNode()
-                .put("correlationId", "corr-e2e-1")
+                .put("correlationId", "corr-comp-test-1")
                 .set("payload", payload)
                 .toString();
-
         kafkaTemplate.send("booking.created.v1", bookingId, envelope).get();
 
-        // wait for final deducted event (signals saga completion)
-        String deducted = deductedQueue.poll(25, java.util.concurrent.TimeUnit.SECONDS);
-        assertTrue(deducted != null && deducted.contains(bookingId), "Expected loyalty.points.deducted.v1 containing bookingId");
+        // publish payment.failed.v1 to trigger compensation
+        JsonNode failPayload = objectMapper.createObjectNode().put("bookingId", bookingId).put("reason", "SIMULATED_FAILURE");
+        String failEnv = objectMapper.createObjectNode().put("correlationId", "corr-comp-test-1").set("payload", failPayload).toString();
+        kafkaTemplate.send("payment.failed.v1", bookingId, failEnv).get();
 
-        // booking should have been confirmed as part of the saga
-        long deadline = System.currentTimeMillis() + 2000;
-        boolean confirmed = false;
+        // expect loyalty.points.released.v1
+        String releasedPoints = releasedPointsQueue.poll(20, java.util.concurrent.TimeUnit.SECONDS);
+        assertTrue(releasedPoints != null && releasedPoints.contains(bookingId), "Expected loyalty.points.released.v1 for bookingId");
+
+        // expect seat.released.v1
+        String releasedSeat = releasedSeatQueue.poll(20, java.util.concurrent.TimeUnit.SECONDS);
+        assertTrue(releasedSeat != null && releasedSeat.contains(bookingId), "Expected seat.released.v1 for bookingId");
+
+        // expect booking.cancelled.v1
+        String cancelled = cancelledQueue.poll(20, java.util.concurrent.TimeUnit.SECONDS);
+        assertTrue(cancelled != null && cancelled.contains(bookingId), "Expected booking.cancelled.v1 for bookingId");
+
+        // booking should be CANCELLED in repository
+        long deadline = System.currentTimeMillis() + 3000;
+        boolean cancelledStatus = false;
         while (System.currentTimeMillis() < deadline) {
             Booking saved = bookingRepository.findById(bookingId);
-            if (saved != null && saved.getStatus() == Booking.Status.CONFIRMED) { confirmed = true; break; }
+            if (saved != null && saved.getStatus() == Booking.Status.CANCELLED) { cancelledStatus = true; break; }
             Thread.sleep(50);
         }
-        assertTrue(confirmed, "Booking should be CONFIRMED by end of saga");
+        assertTrue(cancelledStatus, "Booking should be CANCELLED after compensation path");
     }
-
-    // Simulators moved to top-level SimulatorsTestConfig
 }
