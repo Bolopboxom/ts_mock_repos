@@ -34,6 +34,7 @@ public class PaymentCompletedConsumer {
                 Object pay = objectMapper.createObjectNode().put("bookingId", bookingId).put("ticketNumber", booking.getTicketNumber());
                 String correlationId = node.has("correlationId") ? node.get("correlationId").asText() : null;
                 producer.publishBookingConfirmed(objectMapper.writeValueAsString(pay), correlationId);
+                System.out.println("[consumer-payment] Processed payment.completed.v1 for bookingId=" + bookingId + ", published booking.confirmed.v1");
             }
         } catch (Exception e) {
             System.err.println("PaymentCompletedConsumer error: " + e.getMessage());
