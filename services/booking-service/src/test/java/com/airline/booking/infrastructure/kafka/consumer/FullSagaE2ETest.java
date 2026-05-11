@@ -39,9 +39,6 @@ public class FullSagaE2ETest {
     @Autowired
     private KafkaListenerEndpointRegistry kafkaListenerEndpointRegistry;
 
-    @Autowired(required = false)
-    private java.util.concurrent.CountDownLatch testLatch;
-
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     private void waitForListenerContainers(long timeoutMs) throws InterruptedException {
@@ -109,36 +106,19 @@ public class FullSagaE2ETest {
 
         kafkaTemplate.send("booking.created.v1", bookingId, envelope).get();
 
-        boolean confirmed = false;
-        // if a test latch is available, await it (deterministic); otherwise fall back to polling
-        if (testLatch != null) {
-            System.out.println("[test] awaiting testLatch for payment->booking processing");
-            boolean latched = testLatch.await(10, java.util.concurrent.TimeUnit.SECONDS);
-            System.out.println("[test] testLatch.await returned=" + latched);
-            // allow a small grace for repository write
-            long deadline = System.currentTimeMillis() + 2000;
-            while (System.currentTimeMillis() < deadline) {
-                Booking saved = bookingRepository.findById(bookingId);
-                if (saved != null && saved.getStatus() == Booking.Status.CONFIRMED) { confirmed = true; break; }
-                Thread.sleep(50);
-            }
-        } else {
-            long deadline = System.currentTimeMillis() + 8_000;
-            while (System.currentTimeMillis() < deadline) {
-                Booking saved = bookingRepository.findById(bookingId);
-                if (saved != null && saved.getStatus() == Booking.Status.CONFIRMED) {
-                    confirmed = true;
-                    break;
-                }
-                Thread.sleep(100);
-            }
-        }
-
-        assertTrue(confirmed, "Booking should be CONFIRMED by end of saga");
-
-        // allow more time for the multi-hop simulators to process and publish the deducted event
-        String deducted = deductedQueue.poll(10, java.util.concurrent.TimeUnit.SECONDS);
+        // wait for final deducted event (signals saga completion)
+        String deducted = deductedQueue.poll(15, java.util.concurrent.TimeUnit.SECONDS);
         assertTrue(deducted != null && deducted.contains(bookingId), "Expected loyalty.points.deducted.v1 containing bookingId");
+
+        // booking should have been confirmed as part of the saga
+        long deadline = System.currentTimeMillis() + 2000;
+        boolean confirmed = false;
+        while (System.currentTimeMillis() < deadline) {
+            Booking saved = bookingRepository.findById(bookingId);
+            if (saved != null && saved.getStatus() == Booking.Status.CONFIRMED) { confirmed = true; break; }
+            Thread.sleep(50);
+        }
+        assertTrue(confirmed, "Booking should be CONFIRMED by end of saga");
     }
 
     // Simulators moved to top-level SimulatorsTestConfig

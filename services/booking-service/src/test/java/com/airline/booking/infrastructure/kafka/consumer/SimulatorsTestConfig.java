@@ -95,8 +95,4 @@ public class SimulatorsTestConfig {
         };
     }
 
-    @Bean
-    public java.util.concurrent.CountDownLatch testLatch() {
-        return new java.util.concurrent.CountDownLatch(1);
-    }
 }
