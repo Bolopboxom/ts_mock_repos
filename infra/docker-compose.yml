@@ -39,15 +39,6 @@ services:
       timeout: 30s
       retries: 10
 
-  flyway:
-    image: flyway/flyway:9.22.0
-    depends_on:
-      - oracle
-    volumes:
-      - ./flyway/sql:/flyway/sql:ro
-      - ./flyway/conf/flyway.conf:/flyway/conf/flyway.conf:ro
-    command: -configFiles=/flyway/conf/flyway.conf migrate
-
 volumes:
   oracle-data:
     driver: local
