@@ -1,5 +1,43 @@
 # Airline Booking & Loyalty Platform — SAGA (Choreography)
 
+## Business Overview
+
+### Domain Context
+This system serves the **airline industry**, managing the complete booking lifecycle for flight reservations with integrated loyalty program support.
+
+### User Types
+The platform is designed to support three primary user categories:
+- **CUSTOMER**: Registered users with loyalty accounts
+- **NON-CUSTOMER**: Guest users without loyalty benefits
+- **CORPORATE**: Business accounts with enterprise-level booking capabilities
+
+### Current Implementation: Customer Booking Flow
+
+**Business Goals**:
+
+Customers can:
+- Book flight tickets with seat selection
+- Apply loyalty points to reduce payment amount
+- Complete payment for remaining balance
+- Receive booking confirmation via email/notification
+
+System capabilities:
+- Ensures **data consistency** across distributed microservices
+- Supports **automatic rollback** when payment fails
+- Operates on **event-driven architecture** for scalability
+- Maintains **saga choreography** for distributed transaction management
+
+**Flow Summary**:
+```
+Customer → Book Flight → Apply Loyalty Points → Process Payment → Confirm Booking → Send Notification
+                                                         ↓ (if fails)
+                              Release Points ← Release Seat ← Cancel Booking ← Notify Customer
+```
+
+---
+
+## Technical Overview
+
 A **production-style microservice architecture** demonstrating **Domain-Driven Design (DDD)** principles and **Choreography-based SAGA** pattern implemented with **Kafka**. The system handles customer booking flows and distributed compensation scenarios (payment failure → release points → release seat → cancel booking).
 
 This platform features comprehensive test coverage across unit, integration, and end-to-end layers with proven stabilization techniques for event-driven architectures.
@@ -13,6 +51,41 @@ This platform features comprehensive test coverage across unit, integration, and
 - **Codebase**: 52 Java source files across 5 microservices and 2 shared libraries
 
 ## Architecture & DDD Layers
+
+This platform follows a **multi-module Maven architecture** with clear domain separation:
+
+### Project Structure
+```
+ts_mock_repos/
+├── libs/
+│   ├── common/              # Shared utilities and EventEnvelope
+│   └── events/              # Event schema contracts (JSON)
+└── services/
+    ├── booking-service/     # Booking aggregate & saga coordination
+    ├── seat-service/        # Seat inventory management
+    ├── loyalty-service/     # Loyalty points management
+    ├── payment-service/     # Payment processing
+    └── notification-service/# Customer notifications
+```
+
+### Domain Boundaries
+
+Each service represents a **bounded context** with its own domain model:
+
+| Service | Bounded Context | Core Domain Entities | Responsibilities |
+|---------|----------------|---------------------|------------------|
+| **booking-service** | Booking Management | `Booking`, `BookingStatus` | Saga orchestration, booking lifecycle |
+| **seat-service** | Seat Inventory | `Seat`, `SeatReservation` | Seat allocation, reservation management |
+| **loyalty-service** | Loyalty Program | `LoyaltyAccount`, `PointsTransaction` | Points reserve/deduct/release |
+| **payment-service** | Payment Processing | `Payment`, `PaymentStatus` | Payment execution, failure handling |
+| **notification-service** | Notification | `Notification`, `NotificationChannel` | Email/SMS delivery |
+
+### Shared Libraries
+
+| Library | Purpose | Contents |
+|---------|---------|----------|
+| **libs/common** | Cross-cutting concerns | `EventEnvelope`, correlation utilities, base interfaces |
+| **libs/events** | Event contracts | JSON schemas for all domain events (.v1) |
 
 Each service follows **Domain-Driven Design** principles with clear separation of concerns:
 
@@ -38,7 +111,6 @@ service/
 - **Idempotency**: Each consumer tracks processed eventIds (correlation-based deduplication)
 - **Test Isolation**: Distinct Kafka consumer `groupId` per listener to prevent rebalance conflicts
 
-## Services (in `services/`)
 ## Services (in `services/`)
 
 ### booking-service ✅ **70-80% Test Coverage**
@@ -86,83 +158,41 @@ service/
 
 ## Test Strategy & Coverage
 
-This project demonstrates **comprehensive testing practices** across all layers:
+This project implements a **comprehensive testing strategy** following the test pyramid approach with 18 tests achieving ~70-80% coverage for booking-service.
 
-### Test Pyramid Architecture
-```
-        /\
-       /E2E\      2 tests - Full saga flows with EmbeddedKafka
-      /____\
-     /INTEG.\    9 tests - REST API contracts (@WebMvcTest)
-    /________\
-   /  UNIT    \  7 tests - Business logic (Mockito)
-  /____________\
-```
+### Test Summary
 
-### Test Categories
+| Test Type | Count | Framework | Coverage |
+|-----------|-------|-----------|----------|
+| **Unit Tests** | 7 | JUnit 5 + Mockito | Business logic isolation |
+| **Integration Tests** | 9 | @WebMvcTest + MockMvc | REST API contracts |
+| **E2E Tests** | 2 | @SpringBootTest + @EmbeddedKafka | Full saga flows |
 
-#### 1. Unit Tests (`CreateBookingUseCaseTest` - 7 tests)
-- **Framework**: JUnit 5 + Mockito
-- **Pattern**: `@ExtendWith(MockitoExtension)`, `@Mock`, `@InjectMocks`
-- **Coverage**: Business logic isolation
-- **Key tests**:
-  - Booking creation with correct domain state (`PENDING` status)
-  - Event publishing with proper payload formatting
-  - Unique ID generation (`BKG-<UUID>`)
-  - Correlation ID propagation
-  - Edge cases (zero points, large values)
-
-#### 2. Integration Tests (`BookingControllerTest` - 9 tests)
-- **Framework**: `@WebMvcTest` + MockMvc
-- **Pattern**: `@MockBean` for dependencies, JSON request/response validation
-- **Coverage**: REST API contract, HTTP semantics, DTO mapping
-- **Key tests**:
-  - HTTP 202 Accepted response with correct headers
-  - Correlation ID handling (provided / auto-generated / empty string)
-  - Request validation (all fields present)
-  - Edge cases (zero passengers, large point values)
-
-#### 3. End-to-End Tests (E2E - 2 tests)
-- **Framework**: `@SpringBootTest` + `@EmbeddedKafka` + Spring Kafka Test
-- **Pattern**: Test simulators (`SimulatorsTestConfig`) replace real services
-- **Coverage**: Complete saga flows over Kafka topics
-- **Key tests**:
-  - **`FullSagaE2ETest`**: Happy path (booking → seat → points → payment → confirmed)
-  - **`FullSagaCompensationTest`**: Compensation path (payment failure → rollback chain)
-- **Details**: See [TESTING_GUIDE.md](TESTING_GUIDE.md) for complete test simulator pattern and stabilization techniques
-
-### Running Tests
+### Quick Test Commands
 
 ```powershell
-# Run all tests (from project root)
+# Run all tests
 mvn test
 
-# Run booking-service tests only
-cd services/booking-service
-mvn test
+# Run specific service tests
+cd services/booking-service && mvn test
 
-# Run specific test class
-mvn test -Dtest=CreateBookingUseCaseTest
-
-# Run E2E tests only
-mvn test -Dtest=FullSaga*
-
-# View test results
-cat services/booking-service/target/surefire-reports/*.txt
+# Run specific test category
+mvn test -Dtest=CreateBookingUseCaseTest      # Unit tests
+mvn test -Dtest=BookingControllerTest         # Integration tests
+mvn test -Dtest=FullSaga*                     # E2E tests
 ```
 
-### Test Results Summary
+### Test Results
 ```
 Tests run: 18, Failures: 0, Errors: 0, Skipped: 0
 ├── CreateBookingUseCaseTest:        7 tests (1.2s)
 ├── BookingControllerTest:           9 tests (0.5s)
 ├── FullSagaE2ETest:                 1 test  (3.6s)
 └── FullSagaCompensationTest:        1 test  (7.0s)
-
-Coverage: ~70-80% for booking-service (domain, application, interfaces layers)
 ```
 
-For detailed testing patterns, simulator architecture, and troubleshooting, see **[TESTING_GUIDE.md](TESTING_GUIDE.md)**.
+**For detailed testing patterns, test simulators, stabilization techniques, and troubleshooting guide, see [TESTING_GUIDE.md](TESTING_GUIDE.md).**
 
 ## Event Flow
 
@@ -399,79 +429,3 @@ docker exec -it infra-kafka-1 kafka-console-consumer `
   - Integration: 9 tests (REST API)
   - E2E: 2 tests (full saga flows)
 - **Coverage**: ~70-80% for booking-service (domain, application, interfaces)
-
-## Roadmap & Future Enhancements
-
-### Phase 1: Production Persistence ⏳
-- [ ] Migrate from H2 to Oracle/PostgreSQL with production-ready configurations
-- [ ] Implement persistent repository adapters with MyBatis or JPA
-- [ ] Deploy transactional outbox pattern for atomic database and event publishing
-- [ ] Establish database migration versioning strategy using Flyway or Liquibase
-- [ ] Optimize connection pooling configuration (HikariCP tuning)
-
-### Phase 2: Resilience & Reliability 🎯
-- [ ] Implement idempotency handlers with EventId deduplication in each consumer
-- [ ] Configure Dead Letter Queue (DLQ) infrastructure for poison message handling
-- [ ] Integrate circuit breakers for external service calls (Resilience4j)
-- [ ] Establish retry policies with exponential backoff strategies
-- [ ] Define timeout configurations per service boundary
-
-### Phase 3: Observability 📊
-- [ ] Deploy distributed tracing with OpenTelemetry and Jaeger
-- [ ] Implement structured logging with correlation ID propagation
-- [ ] Configure business metrics (bookings created/confirmed/cancelled per hour)
-- [ ] Establish Kafka consumer lag monitoring dashboards
-- [ ] Implement health checks and readiness probes for Kubernetes deployment
-
-### Phase 4: Test Expansion 🧪
-- [ ] **Unit tests**: Develop comprehensive test suites for loyalty, payment, and seat services
-- [ ] **Integration tests**: Cover all REST endpoints across services
-- [ ] **Contract tests**: Implement Pact contract testing for event schema validation
-- [ ] **Performance tests**: Execute JMeter/Gatling tests for saga throughput benchmarking
-- [ ] **Chaos engineering**: Validate system behavior under service failures and network partitions
-
-### Phase 5: Advanced Features 🚀
-- [ ] Implement saga timeout handling for SLA violation scenarios
-- [ ] Develop manual compensation triggers via admin API for failed sagas
-- [ ] Enable event replay capability for disaster recovery
-- [ ] Integrate schema registry (Confluent Schema Registry with Avro)
-- [ ] Design multi-region deployment strategy with conflict resolution
-
-## Notes and Best Practices
-
-### Current Implementation Status
-- ✅ **Production-ready**: Saga choreography with complete happy path and compensation flows
-- ✅ **Tested**: Comprehensive test coverage across all architectural layers
-- ✅ **Event-driven**: Fully functional Kafka-based event streaming architecture
-- ✅ **DDD compliant**: Clear separation of concerns with proper bounded contexts
-- ⏳ **In development**: H2 in-memory databases (production migration to Oracle/PostgreSQL planned)
-- 🎯 **Roadmap**: Persistent databases, transactional outbox, enhanced idempotency, observability stack
-
-### Architectural Decisions
-
-1. **Choreography vs Orchestration**
-   - **Selected**: Choreography
-   - **Rationale**: Enhanced service autonomy and loose coupling; eliminates single point of failure; supports independent service evolution; natural fit for event-driven architectures
-
-2. **Test Simulators vs Real Services**
-   - **Selected**: Test simulators for E2E testing
-   - **Rationale**: Faster test execution (~10s vs minutes); deterministic behavior without external dependencies; simplified debugging with single JVM; validates Kafka integration and event contracts effectively
-
-3. **BlockingQueue for Test Assertions**
-   - **Selected**: `BlockingQueue.poll(timeout)` pattern
-   - **Rationale**: Synchronizes asynchronous Kafka consumption with JUnit assertions; provides explicit wait semantics; eliminates brittle `Thread.sleep()` patterns; captures all events for comprehensive verification
-
-4. **Distinct Consumer Groups**
-   - **Selected**: Unique `groupId` per `@KafkaListener`
-   - **Rationale**: Prevents consumer rebalancing conflicts during tests; isolates each listener to its own consumer group; reduces partition reassignment churn; mirrors production pattern of one-consumer-group-per-logical-consumer
-
-## Contributing
-- Create feature branches using `feat/*` naming convention
-- Submit pull requests against `develop` branch
-- All PRs must include comprehensive tests (minimum: unit + integration)
-- Maintain existing DDD layer structure and architectural patterns
-- Update documentation for significant architectural changes
-- Ensure `mvn test` passes with 100% success rate before submission
-
-## License
-Internal demonstration project
