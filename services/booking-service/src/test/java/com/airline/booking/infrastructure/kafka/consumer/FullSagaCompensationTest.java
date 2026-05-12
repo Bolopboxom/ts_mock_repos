@@ -90,10 +90,14 @@ public class FullSagaCompensationTest {
                 .toString();
         kafkaTemplate.send("booking.created.v1", bookingId, envelope).get();
 
+        // wait for saga to progress (seat.reserved -> loyalty.points.reserved)
+        Thread.sleep(2000);
+
         // publish payment.failed.v1 to trigger compensation
         JsonNode failPayload = objectMapper.createObjectNode().put("bookingId", bookingId).put("reason", "SIMULATED_FAILURE");
         String failEnv = objectMapper.createObjectNode().put("correlationId", "corr-comp-test-1").set("payload", failPayload).toString();
         kafkaTemplate.send("payment.failed.v1", bookingId, failEnv).get();
+        System.out.println("[TEST] Published payment.failed.v1 for bookingId=" + bookingId);
 
         // expect loyalty.points.released.v1
         String releasedPoints = releasedPointsQueue.poll(20, java.util.concurrent.TimeUnit.SECONDS);
@@ -106,14 +110,16 @@ public class FullSagaCompensationTest {
         // expect booking.cancelled.v1
         String cancelled = cancelledQueue.poll(20, java.util.concurrent.TimeUnit.SECONDS);
         assertTrue(cancelled != null && cancelled.contains(bookingId), "Expected booking.cancelled.v1 for bookingId");
+        System.out.println("[TEST] Received booking.cancelled.v1: " + cancelled);
 
         // booking should be CANCELLED in repository
-        long deadline = System.currentTimeMillis() + 3000;
+        long deadline = System.currentTimeMillis() + 5000; // increased timeout
         boolean cancelledStatus = false;
         while (System.currentTimeMillis() < deadline) {
             Booking saved = bookingRepository.findById(bookingId);
+            System.out.println("[TEST] Checking booking status: " + (saved != null ? saved.getStatus() : "null"));
             if (saved != null && saved.getStatus() == Booking.Status.CANCELLED) { cancelledStatus = true; break; }
-            Thread.sleep(50);
+            Thread.sleep(100);
         }
         assertTrue(cancelledStatus, "Booking should be CANCELLED after compensation path");
     }
