@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "payment.completed.v1",
+  "type": "object",
+  "properties": {
+    "eventId": {"type": "string"},
+    "correlationId": {"type": "string"},
+    "timestamp": {"type": "string", "format": "date-time"},
+    "version": {"type": "string"},
+    "payload": {
+      "type": "object",
+      "properties": {
+        "bookingId": {"type": "string"},
+        "transactionId": {"type": "string"},
+        "amount": {"type": "number"}
+      },
+      "required": ["bookingId","transactionId"]
+    }
+  },
+  "required": ["eventId","correlationId","timestamp","version","payload"]
+}

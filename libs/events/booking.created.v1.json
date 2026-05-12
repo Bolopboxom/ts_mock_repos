@@ -1,0 +1,26 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "booking.created.v1",
+  "type": "object",
+  "properties": {
+    "eventId": {"type": "string"},
+    "correlationId": {"type": "string"},
+    "traceId": {"type": ["string", "null"]},
+    "timestamp": {"type": "string", "format": "date-time"},
+    "version": {"type": "string"},
+    "payload": {
+      "type": "object",
+      "properties": {
+        "bookingId": {"type": "string"},
+        "customerId": {"type": "string"},
+        "flightId": {"type": "string"},
+        "seatClass": {"type": "string"},
+        "passengers": {"type": "integer"},
+        "usePoints": {"type": "integer"},
+        "totalAmount": {"type": "number"}
+      },
+      "required": ["bookingId","customerId","flightId"]
+    }
+  },
+  "required": ["eventId","correlationId","timestamp","version","payload"]
+}

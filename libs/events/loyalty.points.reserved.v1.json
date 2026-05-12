@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "loyalty.points.reserved.v1",
+  "type": "object",
+  "properties": {
+    "eventId": {"type": "string"},
+    "correlationId": {"type": "string"},
+    "timestamp": {"type": "string", "format": "date-time"},
+    "version": {"type": "string"},
+    "payload": {
+      "type": "object",
+      "properties": {
+        "bookingId": {"type": "string"},
+        "customerId": {"type": "string"},
+        "points": {"type": "integer"}
+      },
+      "required": ["bookingId","customerId","points"]
+    }
+  },
+  "required": ["eventId","correlationId","timestamp","version","payload"]
+}
