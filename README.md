@@ -40,7 +40,7 @@ Customer → Book Flight → Apply Loyalty Points → Process Payment → Confir
 
 A **production-style microservice architecture** demonstrating **Domain-Driven Design (DDD)** principles and **Choreography-based SAGA** pattern implemented with **Kafka**. The system handles customer booking flows and distributed compensation scenarios (payment failure → release points → release seat → cancel booking).
 
-This platform features comprehensive test coverage across unit, integration, and end-to-end layers with proven stabilization techniques for event-driven architectures.
+This platform features comprehensive test coverage across unit, integration, and end-to-end layers with proven stabilization techniques for event-driven architectures. **Includes saga tracking system** to monitor distributed transaction progress in real-time.
 
 ## High-level overview
 - **Architecture**: Event-driven microservices with Saga choreography pattern
@@ -48,6 +48,7 @@ This platform features comprehensive test coverage across unit, integration, and
 - **DB strategy**: Database-per-service pattern with H2 in-memory databases (Oracle compatibility mode)
 - **Event envelope**: Shared `EventEnvelope` in `libs/common` (propagates eventId, correlationId, timestamp, payload)
 - **Testing**: 18 comprehensive tests (7 unit, 9 integration, 2 E2E) achieving ~70-80% coverage for booking-service
+- **Saga Tracking**: Real-time monitoring of distributed transactions with REST API endpoints
 - **Codebase**: 52 Java source files across 5 microservices and 2 shared libraries
 
 ## Architecture & DDD Layers

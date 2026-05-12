@@ -4,6 +4,7 @@ import com.airline.booking.BookingApplication;
 import com.airline.booking.application.service.SagaTrackingService;
 import com.airline.booking.application.usecase.CreateBookingUseCase;
 import com.airline.booking.domain.model.Booking;
+import com.airline.booking.domain.model.SagaTracker;
 import com.airline.booking.domain.repository.BookingRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -133,36 +134,58 @@ public class FullSagaE2ETest {
         assertTrue(confirmed, "Booking should be CONFIRMED by end of saga");
         
         // Verify saga tracking
-        System.out.println("\n[TEST] ===== SAGA TRACKING VERIFICATION =====");
-        System.out.println("[TEST] Looking for saga with correlationId: corr-e2e-1");
-        System.out.println("[TEST] SagaTrackingService bean: " + sagaTrackingService);
-        
-        // List all sagas to debug
-        var allSagas = sagaTrackingService.getAllSagas();
-        System.out.println("[TEST] Total sagas in repository: " + allSagas.size());
-        allSagas.forEach(s -> System.out.println("  - TransactionId: " + s.getTransactionId() + ", BookingId: " + s.getBookingId()));
-        
         var sagaTrackerOpt = sagaTrackingService.getSagaByTransactionId("corr-e2e-1");
         assertTrue(sagaTrackerOpt.isPresent(), "Saga tracker should exist for correlationId");
         
         var sagaTracker = sagaTrackerOpt.get();
-        System.out.println("[TEST] Saga Status: " + sagaTracker.getStatus());
-        System.out.println("[TEST] Booking ID: " + sagaTracker.getBookingId());
-        System.out.println("[TEST] Progress: " + String.format("%.1f%%", sagaTracker.getProgressPercentage()));
-        System.out.println("[TEST] Total Steps: " + sagaTracker.getSteps().size());
-        System.out.println("[TEST] Saga Flow:");
-        for (int i = 0; i < sagaTracker.getSteps().size(); i++) {
-            var step = sagaTracker.getSteps().get(i);
-            System.out.println(String.format("  %d. [%s] %s: %s - %s", 
-                i + 1, step.getStatus(), step.getServiceName(), step.getEventType(), step.getDetails()));
-        }
-        System.out.println("[TEST] ==========================================\n");
         
-        assertEquals(com.airline.booking.domain.model.SagaTracker.SagaStatus.COMPLETED, sagaTracker.getStatus(),
+        // Print saga details
+        printSagaDetails(sagaTracker);
+        
+        // Assertions
+        assertEquals(SagaTracker.SagaStatus.COMPLETED, sagaTracker.getStatus(),
             "Saga should be marked as COMPLETED");
         assertEquals(bookingId, sagaTracker.getBookingId(), "Saga should track correct booking ID");
         assertTrue(sagaTracker.getSteps().size() >= 5, 
             "Saga should have at least 5 steps (booking.created, seat.reserved, loyalty.reserved, payment.completed, booking.confirmed)");
+    }
+
+    /**
+     * Helper method to print saga tracking details in a readable format
+     */
+    private void printSagaDetails(SagaTracker saga) {
+        System.out.println("\n╔════════════════════════════════════════════════════════════════╗");
+        System.out.println("║              SAGA TRACKING DETAILS                             ║");
+        System.out.println("╠════════════════════════════════════════════════════════════════╣");
+        System.out.println(String.format("  Transaction ID : %s", saga.getTransactionId()));
+        System.out.println(String.format("  Booking ID     : %s", saga.getBookingId()));
+        System.out.println(String.format("  Status         : %s", saga.getStatus()));
+        System.out.println(String.format("  Started At     : %s", saga.getStartedAt()));
+        System.out.println(String.format("  Completed At   : %s", saga.getCompletedAt() != null ? saga.getCompletedAt() : "In Progress"));
+        System.out.println(String.format("  Progress       : %.1f%%", saga.getProgressPercentage()));
+        System.out.println(String.format("  Current Step   : %s", saga.getCurrentStep()));
+        System.out.println(String.format("  Total Steps    : %d", saga.getSteps().size()));
+        System.out.println("╠════════════════════════════════════════════════════════════════╣");
+        System.out.println("║  SAGA FLOW:                                                    ║");
+        System.out.println("╠════════════════════════════════════════════════════════════════╣");
+        
+        for (int i = 0; i < saga.getSteps().size(); i++) {
+            SagaTracker.SagaStep step = saga.getSteps().get(i);
+            String statusIcon = switch (step.getStatus()) {
+                case SUCCESS -> "✓";
+                case FAILED -> "✗";
+                case COMPENSATED -> "↩";
+            };
+            System.out.println(String.format("  %d. [%s %s] %s", 
+                i + 1, statusIcon, step.getStatus(), step.getServiceName()));
+            System.out.println(String.format("     Event: %s", step.getEventType()));
+            System.out.println(String.format("     Time : %s", step.getTimestamp()));
+            System.out.println(String.format("     Info : %s", step.getDetails()));
+            if (i < saga.getSteps().size() - 1) {
+                System.out.println("     ↓");
+            }
+        }
+        System.out.println("╚════════════════════════════════════════════════════════════════╝\n");
     }
 
     // Simulators moved to top-level SimulatorsTestConfig
