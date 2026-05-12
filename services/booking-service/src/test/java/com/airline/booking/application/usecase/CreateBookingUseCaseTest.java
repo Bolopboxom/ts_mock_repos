@@ -1,6 +1,7 @@
 package com.airline.booking.application.usecase;
 
 import com.airline.booking.application.dto.BookingDto;
+import com.airline.booking.application.service.SagaTrackingService;
 import com.airline.booking.domain.model.Booking;
 import com.airline.booking.domain.repository.BookingRepository;
 import com.airline.booking.infrastructure.kafka.producer.BookingEventProducer;
@@ -27,6 +28,9 @@ class CreateBookingUseCaseTest {
 
     @Mock
     private BookingEventProducer bookingEventProducer;
+    
+    @Mock
+    private SagaTrackingService sagaTrackingService;
 
     @InjectMocks
     private CreateBookingUseCase createBookingUseCase;
@@ -57,6 +61,9 @@ class CreateBookingUseCaseTest {
 
         verify(bookingRepository, times(1)).save(any(Booking.class));
         verify(bookingEventProducer, times(1)).publishBookingCreated(anyString(), eq(testCorrelationId));
+        verify(sagaTrackingService, times(1)).initializeSaga(eq(testCorrelationId), eq(bookingId));
+        verify(sagaTrackingService, times(1)).recordStep(eq(testCorrelationId), eq("booking-service"), 
+            eq("booking.created.v1"), anyString());
     }
 
     @Test
