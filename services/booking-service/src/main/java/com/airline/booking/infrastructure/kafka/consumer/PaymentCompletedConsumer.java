@@ -35,7 +35,7 @@ public class PaymentCompletedConsumer {
             String correlationId = node.has("correlationId") ? node.get("correlationId").asText() : null;
             
             log.info("Processing payment completion for bookingId={}, correlationId={}", bookingId, correlationId);
-            
+
             // Track saga step
             if (correlationId != null) {
                 try {
@@ -56,12 +56,12 @@ public class PaymentCompletedConsumer {
                 booking.setTicketNumber("TKT-" + bookingId.substring(Math.max(0, bookingId.length()-6)));
                 bookingRepository.save(booking);
                 log.info("Booking confirmed and saved: bookingId={}, ticketNumber={}", bookingId, booking.getTicketNumber());
-                
+
                 // publish booking.confirmed.v1
                 Object pay = objectMapper.createObjectNode().put("bookingId", bookingId).put("ticketNumber", booking.getTicketNumber());
                 producer.publishBookingConfirmed(objectMapper.writeValueAsString(pay), correlationId);
                 log.info("Published booking.confirmed.v1 for bookingId={}", bookingId);
-                
+
                 // Track booking confirmed step and mark saga as completed
                 if (correlationId != null) {
                     try {

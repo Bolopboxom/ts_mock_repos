@@ -48,7 +48,7 @@ public class PaymentFailedConsumer {
                 booking.setStatus(com.airline.booking.domain.model.Booking.Status.CANCELLED);
                 bookingRepository.save(booking);
                 log.info("Booking {} set to CANCELLED", bookingId);
-                
+
                 // THEN build cancellation payload and publish
                 JsonNode cancelNode = objectMapper.createObjectNode()
                         .put("bookingId", bookingId)
@@ -62,6 +62,8 @@ public class PaymentFailedConsumer {
                         "Booking cancelled due to payment failure");
                     sagaTrackingService.failSaga(correlationId);
                 }
+
+                log.info("Booking {} set to CANCELLED", bookingId);
             }
         } catch (Exception e) {
             log.error("PaymentFailedConsumer error: {}", e.getMessage(), e);
