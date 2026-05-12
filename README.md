@@ -338,6 +338,13 @@ cd services/notification-service; mvn spring-boot:run
 
 ### 5. Test the Saga
 
+**Service Ports** (configured in `application-demo.yml`):
+- booking-service: port 8081
+- seat-service: port 8082
+- loyalty-service: port 8083
+- payment-service: port 8084
+- notification-service: port 8085
+
 **Create a successful booking** (happy path):
 ```powershell
 curl -X POST http://localhost:8081/bookings `
