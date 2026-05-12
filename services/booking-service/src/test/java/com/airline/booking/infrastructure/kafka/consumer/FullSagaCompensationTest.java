@@ -23,7 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @SpringBootTest(classes = BookingApplication.class, properties = "spring.kafka.bootstrap-servers=${spring.embedded.kafka.brokers}")
 @EmbeddedKafka(partitions = 1, topics = {"booking.created.v1", "seat.reserved.v1", "loyalty.points.reserved.v1", "payment.failed.v1", "loyalty.points.released.v1", "seat.released.v1", "booking.cancelled.v1", "booking.confirmed.v1", "payment.completed.v1", "loyalty.points.deducted.v1"})
 @Import(SimulatorsTestConfig.class)
-@ActiveProfiles("demo")
+@ActiveProfiles("local")
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 public class FullSagaCompensationTest {
 

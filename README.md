@@ -195,7 +195,7 @@ Tests run: 18, Failures: 0, Errors: 0, Skipped: 0
 
 **For detailed testing patterns, test simulators, stabilization techniques, and troubleshooting guide, see [TESTING_GUIDE.md](TESTING_GUIDE.md).**
 
-## Event Flow
+## Transaction Flow
 
 ### Happy Path (Successful Booking)
 ```
@@ -337,9 +337,9 @@ cd services/payment-service; mvn spring-boot:run
 cd services/notification-service; mvn spring-boot:run
 ```
 
-### 5. Test the Saga
+### 5. Transaction Test
 
-**Service Ports** (configured in `application-demo.yml`):
+**Service Ports** (configured in `application-local.yml`):
 - booking-service: port 8081
 - seat-service: port 8082
 - loyalty-service: port 8083
@@ -395,45 +395,9 @@ docker exec -it infra-kafka-1 kafka-console-consumer `
   --from-beginning
 ```
 
-## Key Technical Highlights
-
-### 1. Domain-Driven Design (DDD)
-- **Bounded contexts**: Each service maintains its own domain model (Booking, Seat, LoyaltyAccount, Payment)
-- **Aggregates**: Well-defined aggregate roots with clear consistency boundaries
-- **Ports & Adapters**: Domain layer remains independent of infrastructure concerns
-- **Value Objects**: Immutable types such as `BookingId`, `CustomerId`, `FlightId`
-
-### 2. Saga Choreography Pattern
-- **Decentralized coordination**: Services react autonomously to domain events without central orchestrator
-- **Event-driven flow**: Each service publishes and consumes domain events independently
-- **Distributed compensation**: Automated rollback through reverse event chains
-- **Correlation tracking**: `correlationId` propagates through entire saga lifecycle for traceability
-
-### 3. Kafka Event Streaming
-- **Topic versioning**: All topics use `.v1` suffix to support schema evolution
-- **Event envelope pattern**: Standardized wrapper containing metadata (eventId, correlationId, timestamp)
-- **Consumer isolation**: Distinct `groupId` per listener prevents consumer group rebalancing conflicts
-- **Idempotency**: EventId-based deduplication strategy (production-ready pattern)
-
-### 4. Test Architecture
-- **Test pyramid compliance**: Balanced distribution with more unit tests (7), fewer E2E tests (2)
-- **Test simulators**: Replace downstream services in E2E tests without mocking production code
-- **BlockingQueue synchronization**: Deterministic assertions for asynchronous Kafka message flows
-- **Stabilization patterns**: Partition verification, extended timeouts, post-startup delays for reliability
-
-### 5. Production Readiness Considerations
-- **Database-per-service**: Each service uses isolated H2 in-memory database (production-ready for Oracle migration)
-- **Transactional outbox**: Pattern design available in `libs/common` for atomic DB + event publishing
-- **Dead Letter Queues (DLQ)**: Strategy for handling poison messages and retry exhaustion
-- **Circuit breakers**: Resilience patterns for downstream service failures
-- **Distributed tracing**: OpenTelemetry/Jaeger integration ready for saga flow visibility
-
 ## Project Statistics
-- **Total Java files**: 52
 - **Services**: 5 (booking, seat, loyalty, payment, notification)
-- **Shared libraries**: 2 (events, common)
-- **Test coverage**: 18 tests, 0 failures
+- **Test coverage**:
   - Unit: 7 tests (business logic)
   - Integration: 9 tests (REST API)
   - E2E: 2 tests (full saga flows)
-- **Coverage**: ~70-80% for booking-service (domain, application, interfaces)

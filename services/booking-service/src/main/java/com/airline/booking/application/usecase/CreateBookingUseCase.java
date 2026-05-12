@@ -5,10 +5,12 @@ import com.airline.booking.application.service.SagaTrackingService;
 import com.airline.booking.domain.model.Booking;
 import com.airline.booking.domain.repository.BookingRepository;
 import com.airline.booking.infrastructure.kafka.producer.BookingEventProducer;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.UUID;
 
+@Slf4j
 @Service
 public class CreateBookingUseCase {
 
@@ -34,17 +36,16 @@ public class CreateBookingUseCase {
             sagaTrackingService.initializeSaga(correlationId, bookingId);
             sagaTrackingService.recordStep(correlationId, "booking-service", "booking.created.v1", 
                 "Booking created: " + bookingId);
-            System.out.println("[CreateBookingUseCase] Saga tracking initialized successfully");
+            log.info("Saga tracking initialized successfully for bookingId={}, correlationId={}", bookingId, correlationId);
         } catch (Exception e) {
-            System.err.println("[CreateBookingUseCase] SAGA TRACKING ERROR: " + e.getMessage());
-            e.printStackTrace();
+            log.error("SAGA TRACKING ERROR: {}", e.getMessage(), e);
         }
         
         // publish event (payload as simple JSON string for now)
         String payload = String.format("{\"bookingId\":\"%s\",\"customerId\":\"%s\",\"flightId\":\"%s\",\"passengers\":%d,\"usePoints\":%d}",
                 bookingId, dto.customerId, dto.flightId, dto.passengers, dto.usePoints);
         producer.publishBookingCreated(payload, correlationId);
-        System.out.println("[CreateBookingUseCase] Published booking.created.v1 for bookingId=" + bookingId);
+        log.info("Published booking.created.v1 for bookingId={}, correlationId={}", bookingId, correlationId);
         return bookingId;
     }
 }

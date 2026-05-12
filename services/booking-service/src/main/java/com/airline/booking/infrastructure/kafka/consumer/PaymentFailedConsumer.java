@@ -42,18 +42,19 @@ public class PaymentFailedConsumer {
                     "Payment failed: " + reason);
             }
 
-            // build cancellation payload and publish
-            JsonNode cancelNode = objectMapper.createObjectNode()
-                    .put("bookingId", bookingId)
-                    .put("reason", reason);
-            String cancelJson = objectMapper.writeValueAsString(cancelNode);
-            producer.publishBookingCancelled(cancelJson, correlationId);
-
-            // update booking state to CANCELLED if exists
+            // update booking state to CANCELLED
             var booking = bookingRepository.findById(bookingId);
             if (booking != null) {
                 booking.setStatus(com.airline.booking.domain.model.Booking.Status.CANCELLED);
                 bookingRepository.save(booking);
+                log.info("Booking {} set to CANCELLED", bookingId);
+
+                // THEN build cancellation payload and publish
+                JsonNode cancelNode = objectMapper.createObjectNode()
+                        .put("bookingId", bookingId)
+                        .put("reason", reason);
+                String cancelJson = objectMapper.writeValueAsString(cancelNode);
+                producer.publishBookingCancelled(cancelJson, correlationId);
                 
                 // Track compensation and mark saga as failed
                 if (correlationId != null) {
@@ -61,7 +62,7 @@ public class PaymentFailedConsumer {
                         "Booking cancelled due to payment failure");
                     sagaTrackingService.failSaga(correlationId);
                 }
-                
+
                 log.info("Booking {} set to CANCELLED", bookingId);
             }
         } catch (Exception e) {
